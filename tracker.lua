@@ -1,5 +1,5 @@
 --========================================================
--- BLOX FRUITS TRACKER V11.4
+-- BLOX FRUITS TRACKER V11.6
 -- CONTINUOUS TRACKER + WINDOWS APP SYNC
 --
 -- Local game values : refresh every 1s
@@ -22,11 +22,11 @@ local HttpService = game:GetService("HttpService")
 ----------------------------------------------------------
 
 local LOCAL_INTERVAL = 1
-local FULL_INTERVAL = 15
+local FULL_INTERVAL = 45
 local INITIAL_RETRY = 1
 
 local APP_URL = "http://127.0.0.1:8765/update"
-local APP_SEND_INTERVAL = 1
+local APP_SEND_INTERVAL = 2
 
 ----------------------------------------------------------
 -- INSTANCE GUARD
@@ -108,6 +108,43 @@ local function valueOf(parent, name)
 end
 
 
+local function findDataValueByNames(parent, exactNames, fuzzyWord)
+
+    if not parent then
+        return nil
+    end
+
+    for _, name in ipairs(exactNames or {}) do
+        local obj = parent:FindFirstChild(name, true)
+
+        if obj and obj:IsA("ValueBase") then
+            return obj.Value
+        end
+    end
+
+    if fuzzyWord then
+        local wanted = string.lower(fuzzyWord)
+
+        for _, obj in ipairs(parent:GetDescendants()) do
+            if
+                obj:IsA("ValueBase")
+                and
+                string.find(
+                    string.lower(obj.Name),
+                    wanted,
+                    1,
+                    true
+                )
+            then
+                return obj.Value
+            end
+        end
+    end
+
+    return nil
+end
+
+
 local function copySafe(value, depth)
 
 	depth = depth or 0
@@ -168,7 +205,7 @@ end
 -- WAIT LOCAL PLAYER
 ----------------------------------------------------------
 
-print("[BF V11.4] Waiting LocalPlayer...")
+print("[BF V11.6] Waiting LocalPlayer...")
 
 local Player =
 	Players.LocalPlayer
@@ -191,7 +228,7 @@ if not Player then
 end
 
 print(
-	"[BF V11.4] LocalPlayer:",
+	"[BF V11.6] LocalPlayer:",
 	Player.Name
 )
 
@@ -219,7 +256,7 @@ if not Data then
 	return
 end
 
-print("[BF V11.4] Player.Data ready")
+print("[BF V11.6] Player.Data ready")
 
 ----------------------------------------------------------
 -- WAIT RACE
@@ -246,7 +283,7 @@ if not Race then
 end
 
 print(
-	"[BF V11.4] Race:",
+	"[BF V11.6] Race:",
 	Race.Value
 )
 
@@ -280,7 +317,7 @@ local InventoryConfig =
 		:WaitForChild("Inventory")
 	)
 
-print("[BF V11.4] Remote + Config ready")
+print("[BF V11.6] Remote + Config ready")
 
 ----------------------------------------------------------
 -- META
@@ -732,7 +769,7 @@ end
 
 local State = {
 
-	Version = "11.4",
+	Version = "11.6",
 
 	Ready = false,
 
@@ -806,7 +843,7 @@ local function sendToApp()
 			appWarnedNoRequest = true
 
 			warn(
-				"[BF V11.4] APP sync unavailable: executor has no request/http_request"
+				"[BF V11.6] APP sync unavailable: executor has no request/http_request"
 			)
 
 		end
@@ -884,7 +921,7 @@ local function sendToApp()
 				false
 
 			warn(
-				"[BF V11.4] APP disconnected"
+				"[BF V11.6] APP disconnected"
 			)
 
 		end
@@ -935,7 +972,7 @@ local function sendToApp()
 			true
 
 		print(
-			"[BF V11.4] APP connected:",
+			"[BF V11.6] APP connected:",
 			APP_URL
 		)
 
@@ -983,6 +1020,37 @@ local function refreshLocal()
 
 	State.Account.JobId =
 		game.JobId
+
+
+    ------------------------------------------------------
+    -- Pull Lever / A.Skills - best effort from replicated
+    -- Player.Data. Unknown stays nil.
+    ------------------------------------------------------
+
+    State.Account.PullLever =
+        findDataValueByNames(
+            Data,
+            {
+                "PullLever",
+                "Pull Lever",
+                "LeverPulled",
+                "PulledLever",
+                "TempleLever",
+                "RaceV4Lever"
+            },
+            "lever"
+        )
+
+    State.Account.ASkills =
+        findDataValueByNames(
+            Data,
+            {
+                "ASkills",
+                "A.Skills",
+                "AwakeningSkills"
+            },
+            nil
+        )
 
 	------------------------------------------------------
 	-- BOUNTY
@@ -1421,7 +1489,7 @@ local function refreshFull()
 
 	print(
 		string.format(
-			"[BF V11.4] UPDATE #%d | %.3fs | %s | Fruits:%d Sword:%d Melee:%d",
+			"[BF V11.6] UPDATE #%d | %.3fs | %s | Fruits:%d Sword:%d Melee:%d",
 			State.Revision,
 			State.Stats.LastFullDuration,
 			State.Race.Display
@@ -1443,17 +1511,17 @@ end
 refreshLocal()
 
 print(
-	"[BF V11.4] Continuous tracker started"
+	"[BF V11.6] Continuous tracker started"
 )
 
 print(
-	"[BF V11.4] Full refresh:",
+	"[BF V11.6] Full refresh:",
 	FULL_INTERVAL,
 	"seconds"
 )
 
 print(
-	"[BF V11.4] App sync:",
+	"[BF V11.6] App sync:",
 	APP_URL
 )
 
@@ -1546,5 +1614,5 @@ do
 end
 
 print(
-	"[BF V11.4] Old tracker instance stopped"
+	"[BF V11.6] Old tracker instance stopped"
 )
