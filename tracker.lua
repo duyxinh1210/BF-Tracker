@@ -1,5 +1,5 @@
 --========================================================
--- BLOX FRUITS TRACKER V11.3
+-- BLOX FRUITS TRACKER V11.4
 -- CONTINUOUS TRACKER + WINDOWS APP SYNC
 --
 -- Local game values : refresh every 1s
@@ -168,7 +168,7 @@ end
 -- WAIT LOCAL PLAYER
 ----------------------------------------------------------
 
-print("[BF V11.3] Waiting LocalPlayer...")
+print("[BF V11.4] Waiting LocalPlayer...")
 
 local Player =
 	Players.LocalPlayer
@@ -191,7 +191,7 @@ if not Player then
 end
 
 print(
-	"[BF V11.3] LocalPlayer:",
+	"[BF V11.4] LocalPlayer:",
 	Player.Name
 )
 
@@ -219,7 +219,7 @@ if not Data then
 	return
 end
 
-print("[BF V11.3] Player.Data ready")
+print("[BF V11.4] Player.Data ready")
 
 ----------------------------------------------------------
 -- WAIT RACE
@@ -246,7 +246,7 @@ if not Race then
 end
 
 print(
-	"[BF V11.3] Race:",
+	"[BF V11.4] Race:",
 	Race.Value
 )
 
@@ -280,7 +280,7 @@ local InventoryConfig =
 		:WaitForChild("Inventory")
 	)
 
-print("[BF V11.3] Remote + Config ready")
+print("[BF V11.4] Remote + Config ready")
 
 ----------------------------------------------------------
 -- META
@@ -504,6 +504,14 @@ local function categoryOf(item, meta)
 		lower(meta.Actions)
 
 	------------------------------------------------------
+	-- RACE
+	------------------------------------------------------
+
+	if kind == "race" then
+		return "Races"
+	end
+
+	------------------------------------------------------
 	-- ACCESSORY
 	------------------------------------------------------
 
@@ -645,6 +653,9 @@ local function cleanItem(item, meta)
 		Mastery =
 			p.Mastery,
 
+		Evolution =
+			p.Evolution,
+
 		IsOwned =
 			p.IsOwned == true,
 
@@ -721,7 +732,7 @@ end
 
 local State = {
 
-	Version = "11.3",
+	Version = "11.4",
 
 	Ready = false,
 
@@ -740,7 +751,8 @@ local State = {
 		Guns = {},
 		StoredFruits = {},
 		Accessories = {},
-		Materials = {}
+		Materials = {},
+		Races = {}
 
 	},
 
@@ -794,7 +806,7 @@ local function sendToApp()
 			appWarnedNoRequest = true
 
 			warn(
-				"[BF V11.3] APP sync unavailable: executor has no request/http_request"
+				"[BF V11.4] APP sync unavailable: executor has no request/http_request"
 			)
 
 		end
@@ -872,7 +884,7 @@ local function sendToApp()
 				false
 
 			warn(
-				"[BF V11.3] APP disconnected"
+				"[BF V11.4] APP disconnected"
 			)
 
 		end
@@ -923,7 +935,7 @@ local function sendToApp()
 			true
 
 		print(
-			"[BF V11.3] APP connected:",
+			"[BF V11.4] APP connected:",
 			APP_URL
 		)
 
@@ -1145,7 +1157,8 @@ local function refreshFull()
 		Guns = {},
 		StoredFruits = {},
 		Accessories = {},
-		Materials = {}
+		Materials = {},
+		Races = {}
 
 	}
 
@@ -1310,6 +1323,11 @@ local function refreshFull()
 				Inventory.Guns
 			),
 
+		Race =
+			findEquipped(
+				Inventory.Races
+			),
+
 		Fruit =
 			CurrentFruit
 
@@ -1403,7 +1421,7 @@ local function refreshFull()
 
 	print(
 		string.format(
-			"[BF V11.3] UPDATE #%d | %.3fs | %s | Fruits:%d Sword:%d Melee:%d",
+			"[BF V11.4] UPDATE #%d | %.3fs | %s | Fruits:%d Sword:%d Melee:%d",
 			State.Revision,
 			State.Stats.LastFullDuration,
 			State.Race.Display
@@ -1425,17 +1443,17 @@ end
 refreshLocal()
 
 print(
-	"[BF V11.3] Continuous tracker started"
+	"[BF V11.4] Continuous tracker started"
 )
 
 print(
-	"[BF V11.3] Full refresh:",
+	"[BF V11.4] Full refresh:",
 	FULL_INTERVAL,
 	"seconds"
 )
 
 print(
-	"[BF V11.3] App sync:",
+	"[BF V11.4] App sync:",
 	APP_URL
 )
 
@@ -1528,5 +1546,5 @@ do
 end
 
 print(
-	"[BF V11.3] Old tracker instance stopped"
+	"[BF V11.4] Old tracker instance stopped"
 )
