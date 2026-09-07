@@ -1,10 +1,13 @@
 --========================================================
--- BLOX FRUITS TRACKER V11.2
--- CONTINUOUS / AUTO-EXEC SAFE
+-- BLOX FRUITS TRACKER V11.3
+-- CONTINUOUS TRACKER + WINDOWS APP SYNC
 --
--- Local replicated values : refresh 1s
--- Full inventory remote   : refresh 15s
--- Initial remote failure  : retry 1s
+-- Local game values : refresh every 1s
+-- Full item remote  : refresh every 15s
+-- App sync          : every 1s + immediately after full refresh
+--
+-- App endpoint:
+-- http://127.0.0.1:8765/update
 --
 -- Output:
 -- getgenv().BF_TRACKER_DATA
@@ -12,6 +15,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
 
 ----------------------------------------------------------
 -- SETTINGS
@@ -21,11 +25,11 @@ local LOCAL_INTERVAL = 1
 local FULL_INTERVAL = 15
 local INITIAL_RETRY = 1
 
+local APP_URL = "http://127.0.0.1:8765/update"
+local APP_SEND_INTERVAL = 1
 
 ----------------------------------------------------------
 -- INSTANCE GUARD
---
--- Nếu chạy lại script, loop cũ tự dừng.
 ----------------------------------------------------------
 
 local ENV = getgenv and getgenv() or _G
@@ -36,6 +40,15 @@ ENV.BF_TRACKER_INSTANCE =
 local RUN_ID =
 	ENV.BF_TRACKER_INSTANCE
 
+----------------------------------------------------------
+-- HTTP REQUEST RESOLVER
+----------------------------------------------------------
+
+local httpRequest =
+	request
+	or http_request
+	or (syn and syn.request)
+	or (fluxus and fluxus.request)
 
 ----------------------------------------------------------
 -- HELPERS
@@ -95,18 +108,76 @@ local function valueOf(parent, name)
 end
 
 
+local function copySafe(value, depth)
+
+	depth = depth or 0
+
+	if depth > 12 then
+		return nil
+	end
+
+	local t = typeof(value)
+
+	if
+		t == "string"
+		or
+		t == "number"
+		or
+		t == "boolean"
+	then
+		return value
+	end
+
+	if t == "table" then
+
+		local out = {}
+
+		for k, v in pairs(value) do
+
+			local kt = typeof(k)
+
+			if
+				kt == "string"
+				or
+				kt == "number"
+			then
+
+				local safe =
+					copySafe(
+						v,
+						depth + 1
+					)
+
+				if safe ~= nil then
+					out[k] = safe
+				end
+
+			end
+
+		end
+
+		return out
+
+	end
+
+	return nil
+
+end
+
 ----------------------------------------------------------
 -- WAIT LOCAL PLAYER
---
--- FIX lỗi auto-exec của V11.1
 ----------------------------------------------------------
 
-print("[BF V11.2] Waiting LocalPlayer...")
+print("[BF V11.3] Waiting LocalPlayer...")
 
 local Player =
 	Players.LocalPlayer
 
-while not Player do
+while
+	ENV.BF_TRACKER_INSTANCE == RUN_ID
+	and
+	not Player
+do
 
 	task.wait(0.1)
 
@@ -115,12 +186,14 @@ while not Player do
 
 end
 
+if not Player then
+	return
+end
 
 print(
-	"[BF V11.2] LocalPlayer:",
+	"[BF V11.3] LocalPlayer:",
 	Player.Name
 )
-
 
 ----------------------------------------------------------
 -- WAIT PLAYER DATA
@@ -129,7 +202,11 @@ print(
 local Data =
 	Player:FindFirstChild("Data")
 
-while not Data do
+while
+	ENV.BF_TRACKER_INSTANCE == RUN_ID
+	and
+	not Data
+do
 
 	task.wait(0.1)
 
@@ -138,9 +215,11 @@ while not Data do
 
 end
 
+if not Data then
+	return
+end
 
-print("[BF V11.2] Player.Data ready")
-
+print("[BF V11.3] Player.Data ready")
 
 ----------------------------------------------------------
 -- WAIT RACE
@@ -149,7 +228,11 @@ print("[BF V11.2] Player.Data ready")
 local Race =
 	Data:FindFirstChild("Race")
 
-while not Race do
+while
+	ENV.BF_TRACKER_INSTANCE == RUN_ID
+	and
+	not Race
+do
 
 	task.wait(0.1)
 
@@ -158,12 +241,14 @@ while not Race do
 
 end
 
+if not Race then
+	return
+end
 
 print(
-	"[BF V11.2] Race:",
+	"[BF V11.3] Race:",
 	Race.Value
 )
-
 
 ----------------------------------------------------------
 -- WAIT REMOTE
@@ -183,7 +268,6 @@ local GetAll =
 		"RF/GetAllItemValues"
 	)
 
-
 ----------------------------------------------------------
 -- INVENTORY CONFIG
 ----------------------------------------------------------
@@ -196,9 +280,7 @@ local InventoryConfig =
 		:WaitForChild("Inventory")
 	)
 
-
-print("[BF V11.2] Remote + Config ready")
-
+print("[BF V11.3] Remote + Config ready")
 
 ----------------------------------------------------------
 -- META
@@ -223,10 +305,8 @@ local function getMeta(id)
 
 	end
 
-
 	local raw =
 		tostring(cfg.Id or "")
-
 
 	local name =
 		raw:gsub(
@@ -234,13 +314,11 @@ local function getMeta(id)
 			""
 		)
 
-
 	name =
 		name:gsub(
 			"^%-%-%s*",
 			""
 		)
-
 
 	if name == "" then
 
@@ -248,11 +326,10 @@ local function getMeta(id)
 			tostring(
 				cfg["Stack Display Name"]
 				or
-				("Unknown #" .. id)
+				("Unknown #" .. tostring(id))
 			)
 
 	end
-
 
 	local kind =
 		raw:match(
@@ -260,7 +337,6 @@ local function getMeta(id)
 		)
 		or
 		"Unknown"
-
 
 	return {
 
@@ -295,7 +371,6 @@ local function getMeta(id)
 
 end
 
-
 ----------------------------------------------------------
 -- GROUP GetAllItemValues
 ----------------------------------------------------------
@@ -303,7 +378,6 @@ end
 local function groupRecords(raw)
 
 	local grouped = {}
-
 
 	for _, row in pairs(raw) do
 
@@ -318,7 +392,6 @@ local function groupRecords(raw)
 			local id =
 				row.ItemId
 
-
 			grouped[id] =
 				grouped[id]
 				or
@@ -327,18 +400,14 @@ local function groupRecords(raw)
 					Properties = {}
 				}
 
-
 			local props =
 				grouped[id].Properties
-
 
 			local key =
 				row.Key
 
-
 			local value =
 				row.Value
-
 
 			if typeof(value) == "boolean" then
 
@@ -351,7 +420,6 @@ local function groupRecords(raw)
 					props[key] = false
 
 				end
-
 
 			elseif
 				typeof(value) == "number"
@@ -376,7 +444,6 @@ local function groupRecords(raw)
 
 				end
 
-
 			elseif props[key] == nil then
 
 				props[key] =
@@ -388,11 +455,9 @@ local function groupRecords(raw)
 
 	end
 
-
 	return grouped
 
 end
-
 
 ----------------------------------------------------------
 -- OWNERSHIP
@@ -402,7 +467,6 @@ local function strictOwned(item)
 
 	local p =
 		item.Properties
-
 
 	return
 		p.IsOwned == true
@@ -414,7 +478,6 @@ local function strictOwned(item)
 		)
 
 end
-
 
 ----------------------------------------------------------
 -- CATEGORY
@@ -440,7 +503,6 @@ local function categoryOf(item, meta)
 	local actions =
 		lower(meta.Actions)
 
-
 	------------------------------------------------------
 	-- ACCESSORY
 	------------------------------------------------------
@@ -459,7 +521,6 @@ local function categoryOf(item, meta)
 
 	end
 
-
 	------------------------------------------------------
 	-- MATERIAL
 	------------------------------------------------------
@@ -476,7 +537,6 @@ local function categoryOf(item, meta)
 
 	end
 
-
 	------------------------------------------------------
 	-- SWORD
 	------------------------------------------------------
@@ -491,7 +551,6 @@ local function categoryOf(item, meta)
 
 	end
 
-
 	------------------------------------------------------
 	-- GUN
 	------------------------------------------------------
@@ -505,7 +564,6 @@ local function categoryOf(item, meta)
 		return "Guns"
 
 	end
-
 
 	------------------------------------------------------
 	-- STORED FRUIT
@@ -526,7 +584,6 @@ local function categoryOf(item, meta)
 				or
 				contains(actions, "fruit")
 
-
 			local fruitName =
 				string.find(
 					meta.Name,
@@ -534,7 +591,6 @@ local function categoryOf(item, meta)
 					1,
 					true
 				) ~= nil
-
 
 			if fruitHint or fruitName then
 
@@ -545,7 +601,6 @@ local function categoryOf(item, meta)
 		end
 
 	end
-
 
 	------------------------------------------------------
 	-- MELEE
@@ -563,11 +618,9 @@ local function categoryOf(item, meta)
 
 	end
 
-
 	return nil
 
 end
-
 
 ----------------------------------------------------------
 -- CLEAN ITEM
@@ -577,7 +630,6 @@ local function cleanItem(item, meta)
 
 	local p =
 		item.Properties
-
 
 	return {
 
@@ -606,7 +658,6 @@ local function cleanItem(item, meta)
 
 end
 
-
 ----------------------------------------------------------
 -- FRUIT COMPARE
 ----------------------------------------------------------
@@ -616,19 +667,15 @@ local function sameFruit(a, b)
 	a = lower(a)
 	b = lower(b)
 
-
 	if a == b then
 		return true
 	end
 
-
 	local aa =
 		a:match("^([^%-]+)")
 
-
 	local bb =
 		b:match("^([^%-]+)")
-
 
 	return
 		aa
@@ -638,7 +685,6 @@ local function sameFruit(a, b)
 		aa == bb
 
 end
-
 
 ----------------------------------------------------------
 -- FIND CURRENT RACE ITEM
@@ -650,7 +696,6 @@ local function findRaceItem(grouped)
 
 		local meta =
 			getMeta(id)
-
 
 		if
 			lower(meta.Kind) == "race"
@@ -666,11 +711,9 @@ local function findRaceItem(grouped)
 
 	end
 
-
 	return nil, nil
 
 end
-
 
 ----------------------------------------------------------
 -- STATE
@@ -678,7 +721,7 @@ end
 
 local State = {
 
-	Version = "11.2",
+	Version = "11.3",
 
 	Ready = false,
 
@@ -715,12 +758,15 @@ local State = {
 
 		LastLocalUpdate = nil,
 
-		LastError = nil
+		LastError = nil,
+
+		AppLastSend = nil,
+
+		AppLastError = nil
 
 	}
 
 }
-
 
 ENV.BF_TRACKER_DATA =
 	State
@@ -728,12 +774,167 @@ ENV.BF_TRACKER_DATA =
 _G.BF_TRACKER_DATA =
 	State
 
+----------------------------------------------------------
+-- APP SYNC
+----------------------------------------------------------
+
+local appConnected =
+	false
+
+local appWarnedNoRequest =
+	false
+
+
+local function sendToApp()
+
+	if not httpRequest then
+
+		if not appWarnedNoRequest then
+
+			appWarnedNoRequest = true
+
+			warn(
+				"[BF V11.3] APP sync unavailable: executor has no request/http_request"
+			)
+
+		end
+
+		return false
+
+	end
+
+	------------------------------------------------------
+	-- Copy only JSON-safe values.
+	-- No cookie/token/password fields are collected here.
+	------------------------------------------------------
+
+	local payload =
+		copySafe(State)
+
+	if not payload then
+		return false
+	end
+
+	payload.SentAt =
+		os.time()
+
+	local okJson, body =
+		pcall(function()
+
+			return
+				HttpService:
+				JSONEncode(payload)
+
+		end)
+
+	if not okJson then
+
+		State.Stats.AppLastError =
+			tostring(body)
+
+		return false
+
+	end
+
+	local okRequest, response =
+		pcall(function()
+
+			return httpRequest({
+
+				Url =
+					APP_URL,
+
+				Method =
+					"POST",
+
+				Headers = {
+
+					["Content-Type"] =
+						"application/json"
+
+				},
+
+				Body =
+					body
+
+			})
+
+		end)
+
+	if not okRequest then
+
+		State.Stats.AppLastError =
+			tostring(response)
+
+		if appConnected then
+
+			appConnected =
+				false
+
+			warn(
+				"[BF V11.3] APP disconnected"
+			)
+
+		end
+
+		return false
+
+	end
+
+	local statusCode =
+		typeof(response) == "table"
+		and
+		(
+			response.StatusCode
+			or
+			response.Status
+			or
+			response.status
+		)
+		or
+		nil
+
+	if
+		statusCode
+		and
+		tonumber(statusCode)
+		and
+		tonumber(statusCode) >= 400
+	then
+
+		State.Stats.AppLastError =
+			"HTTP "
+			..
+			tostring(statusCode)
+
+		return false
+
+	end
+
+	State.Stats.AppLastSend =
+		os.time()
+
+	State.Stats.AppLastError =
+		nil
+
+	if not appConnected then
+
+		appConnected =
+			true
+
+		print(
+			"[BF V11.3] APP connected:",
+			APP_URL
+		)
+
+	end
+
+	return true
+
+end
 
 ----------------------------------------------------------
 -- FAST LOCAL REFRESH
---
--- Không remote.
--- Chạy mỗi 1 giây.
 ----------------------------------------------------------
 
 local function refreshLocal()
@@ -771,7 +972,6 @@ local function refreshLocal()
 	State.Account.JobId =
 		game.JobId
 
-
 	------------------------------------------------------
 	-- BOUNTY
 	------------------------------------------------------
@@ -780,7 +980,6 @@ local function refreshLocal()
 		Player:FindFirstChild(
 			"leaderstats"
 		)
-
 
 	if leaderstats then
 
@@ -791,7 +990,6 @@ local function refreshLocal()
 			)
 
 	end
-
 
 	------------------------------------------------------
 	-- RACE LOCAL VALUES
@@ -809,17 +1007,15 @@ local function refreshLocal()
 	State.Race.C =
 		valueOf(Race, "C")
 
-
 	------------------------------------------------------
-	-- Nếu đã biết Version từ full scan
-	-- thì Tier update ngay theo C
+	-- If full scan already knows Evolution,
+	-- keep V4 Tier live from Race.C
 	------------------------------------------------------
 
 	if State.Race.Version == 4 then
 
 		State.Race.Tier =
 			State.Race.C
-
 
 		State.Race.Display =
 			string.format(
@@ -836,7 +1032,6 @@ local function refreshLocal()
 		State.Race.Tier =
 			nil
 
-
 		State.Race.Display =
 			string.format(
 				"%s V%s",
@@ -848,12 +1043,10 @@ local function refreshLocal()
 
 	end
 
-
 	State.Stats.LastLocalUpdate =
 		os.time()
 
 end
-
 
 ----------------------------------------------------------
 -- FULL REMOTE REFRESH
@@ -864,10 +1057,8 @@ local function refreshFull()
 	local started =
 		os.clock()
 
-
 	State.Status =
 		"REFRESHING"
-
 
 	local ok, raw =
 		pcall(function()
@@ -877,7 +1068,6 @@ local function refreshFull()
 				InvokeServer()
 
 		end)
-
 
 	if
 		not ok
@@ -894,15 +1084,12 @@ local function refreshFull()
 			or
 			"WAITING_DATA"
 
-
 		State.Stats.LastError =
 			tostring(raw)
-
 
 		return false
 
 	end
-
 
 	------------------------------------------------------
 	-- GROUP
@@ -911,14 +1098,12 @@ local function refreshFull()
 	local grouped =
 		groupRecords(raw)
 
-
 	------------------------------------------------------
 	-- CURRENT RACE
 	------------------------------------------------------
 
 	local raceItem =
 		findRaceItem(grouped)
-
 
 	if
 		not raceItem
@@ -937,21 +1122,17 @@ local function refreshFull()
 			or
 			"WAITING_RACE"
 
-
 		State.Stats.LastError =
 			"Race Evolution not ready"
-
 
 		return false
 
 	end
 
-
 	local evolution =
 		raceItem
 		.Properties
 		.Evolution
-
 
 	------------------------------------------------------
 	-- INVENTORY
@@ -960,23 +1141,16 @@ local function refreshFull()
 	local Inventory = {
 
 		Melee = {},
-
 		Swords = {},
-
 		Guns = {},
-
 		StoredFruits = {},
-
 		Accessories = {},
-
 		Materials = {}
 
 	}
 
-
 	local CurrentFruit =
 		nil
-
 
 	local currentFruitName =
 		tostring(
@@ -988,12 +1162,10 @@ local function refreshFull()
 			""
 		)
 
-
 	for id, item in pairs(grouped) do
 
 		local meta =
 			getMeta(id)
-
 
 		--------------------------------------------------
 		-- CURRENT FRUIT
@@ -1018,7 +1190,6 @@ local function refreshFull()
 					meta
 				)
 
-
 			if
 				not CurrentFruit
 				or
@@ -1042,7 +1213,6 @@ local function refreshFull()
 
 		end
 
-
 		--------------------------------------------------
 		-- OWNED INVENTORY
 		--------------------------------------------------
@@ -1054,7 +1224,6 @@ local function refreshFull()
 					item,
 					meta
 				)
-
 
 			if
 				category
@@ -1076,7 +1245,6 @@ local function refreshFull()
 
 	end
 
-
 	------------------------------------------------------
 	-- SORT
 	------------------------------------------------------
@@ -1097,7 +1265,6 @@ local function refreshFull()
 
 	end
 
-
 	------------------------------------------------------
 	-- EQUIPPED
 	------------------------------------------------------
@@ -1116,7 +1283,6 @@ local function refreshFull()
 
 	end
 
-
 	------------------------------------------------------
 	-- APPLY STATE
 	------------------------------------------------------
@@ -1124,10 +1290,8 @@ local function refreshFull()
 	State.Inventory =
 		Inventory
 
-
 	State.CurrentFruit =
 		CurrentFruit
-
 
 	State.Equipped = {
 
@@ -1151,36 +1315,28 @@ local function refreshFull()
 
 	}
 
-
 	State.Race.Name =
 		Race.Value
-
 
 	State.Race.Version =
 		evolution
 
-
 	State.Race.Evolution =
 		evolution
-
 
 	State.Race.A =
 		valueOf(Race, "A")
 
-
 	State.Race.B =
 		valueOf(Race, "B")
 
-
 	State.Race.C =
 		valueOf(Race, "C")
-
 
 	if evolution == 4 then
 
 		State.Race.Tier =
 			State.Race.C
-
 
 		State.Race.Display =
 			string.format(
@@ -1197,7 +1353,6 @@ local function refreshFull()
 		State.Race.Tier =
 			nil
 
-
 		State.Race.Display =
 			string.format(
 				"%s V%s",
@@ -1209,40 +1364,38 @@ local function refreshFull()
 
 	end
 
-
 	State.Ready =
 		true
-
 
 	State.Status =
 		"READY"
 
-
 	State.Revision += 1
 
-
 	State.Stats.FullRefreshes += 1
-
 
 	State.Stats.RawRecords =
 		countTable(raw)
 
-
 	State.Stats.UniqueItemIds =
 		countTable(grouped)
-
 
 	State.Stats.LastFullDuration =
 		os.clock() - started
 
-
 	State.Stats.LastFullUpdate =
 		os.time()
-
 
 	State.Stats.LastError =
 		nil
 
+	------------------------------------------------------
+	-- Send complete fresh data immediately
+	------------------------------------------------------
+
+	task.spawn(
+		sendToApp
+	)
 
 	------------------------------------------------------
 	-- OUTPUT
@@ -1250,7 +1403,7 @@ local function refreshFull()
 
 	print(
 		string.format(
-			"[BF V11.2] UPDATE #%d | %.3fs | %s | Fruits:%d Sword:%d Melee:%d",
+			"[BF V11.3] UPDATE #%d | %.3fs | %s | Fruits:%d Sword:%d Melee:%d",
 			State.Revision,
 			State.Stats.LastFullDuration,
 			State.Race.Display
@@ -1261,11 +1414,9 @@ local function refreshFull()
 		)
 	)
 
-
 	return true
 
 end
-
 
 ----------------------------------------------------------
 -- INITIAL LOCAL
@@ -1273,18 +1424,20 @@ end
 
 refreshLocal()
 
-
 print(
-	"[BF V11.2] Continuous tracker started"
+	"[BF V11.3] Continuous tracker started"
 )
 
-
 print(
-	"[BF V11.2] Full refresh:",
+	"[BF V11.3] Full refresh:",
 	FULL_INTERVAL,
 	"seconds"
 )
 
+print(
+	"[BF V11.3] App sync:",
+	APP_URL
+)
 
 ----------------------------------------------------------
 -- MAIN LOOP
@@ -1293,6 +1446,8 @@ print(
 local nextFull =
 	0
 
+local nextAppSend =
+	0
 
 while
 	ENV.BF_TRACKER_INSTANCE
@@ -1306,6 +1461,27 @@ do
 
 	refreshLocal()
 
+	------------------------------------------------------
+	-- SEND CURRENT STATE TO LOCAL APP
+	--
+	-- Before first full scan this gives the app
+	-- username/level/beli/etc. as soon as possible.
+	-- After first full scan it keeps the full inventory
+	-- plus live local stats updated.
+	------------------------------------------------------
+
+	if os.clock() >= nextAppSend then
+
+		task.spawn(
+			sendToApp
+		)
+
+		nextAppSend =
+			os.clock()
+			+
+			APP_SEND_INTERVAL
+
+	end
 
 	------------------------------------------------------
 	-- FULL DATA
@@ -1316,7 +1492,6 @@ do
 		local success =
 			refreshFull()
 
-
 		if success then
 
 			nextFull =
@@ -1325,11 +1500,6 @@ do
 				FULL_INTERVAL
 
 		else
-
-			------------------------------------------------
-			-- Lúc mới join chưa load xong:
-			-- retry nhanh hơn.
-			------------------------------------------------
 
 			if State.Ready then
 
@@ -1351,14 +1521,12 @@ do
 
 	end
 
-
 	task.wait(
 		LOCAL_INTERVAL
 	)
 
 end
 
-
 print(
-	"[BF V11.2] Old tracker instance stopped"
+	"[BF V11.3] Old tracker instance stopped"
 )
