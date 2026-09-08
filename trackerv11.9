@@ -3,7 +3,7 @@
 -- CONTINUOUS TRACKER + WINDOWS APP SYNC
 --
 -- Local game values : refresh every 1s
--- Full item remote  : refresh every 45s
+-- Full item remote  : refresh every 30s
 -- App sync          : every 1s + immediately after full refresh
 --
 -- App endpoint:
@@ -22,7 +22,7 @@ local HttpService = game:GetService("HttpService")
 ----------------------------------------------------------
 
 local LOCAL_INTERVAL = 1
-local FULL_INTERVAL = 45
+local FULL_INTERVAL = 30
 local INITIAL_RETRY = 1
 
 local APP_URL = "http://127.0.0.1:8765/update"
@@ -312,7 +312,7 @@ local GetAll =
 --   CommF_:InvokeServer("CheckTempleDoor") == true  -> pulled
 --   CommF_:InvokeServer("CheckTempleDoor") == false -> not pulled
 --
--- Queried only on successful FULL refreshes (45s),
+-- Queried only on successful FULL refreshes (30s),
 -- not every local 1s refresh.
 ----------------------------------------------------------
 
@@ -1193,7 +1193,7 @@ local function refreshLocal()
     -- DO NOT overwrite it here from Player.Data.
     -- No reliable replicated Player.Data field was found.
     -- It is refreshed by CheckTempleDoor on each successful
-    -- FULL refresh (45s) below.
+    -- FULL refresh (30s) below.
     ------------------------------------------------------
 
     State.Account.ASkills =
