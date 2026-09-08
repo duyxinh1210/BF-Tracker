@@ -34,11 +34,11 @@ local APP_SEND_INTERVAL = 2
 
 local ENV = getgenv and getgenv() or _G
 
-ENV.BF_TRACKER_INSTANCE =
-	(ENV.BF_TRACKER_INSTANCE or 0) + 1
+ENV.BF_TRACKER_V11_9_INSTANCE =
+	(ENV.BF_TRACKER_V11_9_INSTANCE or 0) + 1
 
 local RUN_ID =
-	ENV.BF_TRACKER_INSTANCE
+	ENV.BF_TRACKER_V11_9_INSTANCE
 
 ----------------------------------------------------------
 -- HTTP REQUEST RESOLVER
@@ -211,7 +211,7 @@ local Player =
 	Players.LocalPlayer
 
 while
-	ENV.BF_TRACKER_INSTANCE == RUN_ID
+	ENV.BF_TRACKER_V11_9_INSTANCE == RUN_ID
 	and
 	not Player
 do
@@ -240,7 +240,7 @@ local Data =
 	Player:FindFirstChild("Data")
 
 while
-	ENV.BF_TRACKER_INSTANCE == RUN_ID
+	ENV.BF_TRACKER_V11_9_INSTANCE == RUN_ID
 	and
 	not Data
 do
@@ -266,7 +266,7 @@ local Race =
 	Data:FindFirstChild("Race")
 
 while
-	ENV.BF_TRACKER_INSTANCE == RUN_ID
+	ENV.BF_TRACKER_V11_9_INSTANCE == RUN_ID
 	and
 	not Race
 do
@@ -1265,6 +1265,11 @@ local function refreshFull()
 		State.Stats.LastError =
 			tostring(raw)
 
+		warn(
+			"[BF V11.9] FULL refresh failed:",
+			State.Stats.LastError
+		)
+
 		return false
 
 	end
@@ -1302,6 +1307,11 @@ local function refreshFull()
 
 		State.Stats.LastError =
 			"Race Evolution not ready"
+
+		warn(
+			"[BF V11.9] FULL refresh waiting:",
+			State.Stats.LastError
+		)
 
 		return false
 
@@ -1665,7 +1675,7 @@ local nextAppSend =
 	0
 
 while
-	ENV.BF_TRACKER_INSTANCE
+	ENV.BF_TRACKER_V11_9_INSTANCE
 	==
 	RUN_ID
 do
@@ -1743,5 +1753,5 @@ do
 end
 
 print(
-	"[BF V11.9] Old tracker instance stopped"
+	"[BF V11.9] This V11.9 instance stopped because another V11.9 instance started"
 )
