@@ -362,6 +362,59 @@ local function queryPullLever()
 end
 
 ----------------------------------------------------------
+-- CURRENT RACE VERSION
+--
+-- Do NOT require Inventory.Race.Properties.Evolution.
+-- V3 accounts may not expose a numeric Evolution property
+-- even though their inventory is already fully readable.
+--
+-- Confirmed server read:
+--   CommF_:InvokeServer("getRaceLevel")
+--     RoyHolder3773  -> 3
+--     JulieSurge7834 -> 4
+----------------------------------------------------------
+
+local function queryRaceLevel()
+
+	local ok, result =
+		pcall(function()
+
+			return
+				CommF_:
+					InvokeServer(
+						"getRaceLevel"
+					)
+
+		end)
+
+	if not ok then
+
+		return
+			nil,
+			tostring(result)
+
+	end
+
+	local n =
+		tonumber(result)
+
+	if n then
+
+		return
+			n,
+			nil
+
+	end
+
+	return
+		nil,
+		"Unexpected getRaceLevel result: "
+		..
+		tostring(result)
+
+end
+
+----------------------------------------------------------
 -- INVENTORY CONFIG
 ----------------------------------------------------------
 
@@ -919,7 +972,11 @@ local State = {
 
 		PullLeverLastCheck = nil,
 
-		PullLeverLastError = nil
+		PullLeverLastError = nil,
+
+		RaceLevelLastCheck = nil,
+
+		RaceLevelLastError = nil
 
 	}
 
@@ -1288,39 +1345,44 @@ local function refreshFull()
 	local raceItem =
 		findRaceItem(grouped)
 
+	local evolution =
+		nil
+
 	if
-		not raceItem
-		or
+		raceItem
+		and
+		raceItem.Properties
+		and
 		typeof(
-			raceItem
-			.Properties
-			.Evolution
-		) ~= "number"
+			raceItem.Properties.Evolution
+		) == "number"
 	then
 
-		State.Status =
-			State.Ready
-			and
-			"READY"
-			or
-			"WAITING_RACE"
-
-		State.Stats.LastError =
-			"Race Evolution not ready"
-
-		warn(
-			"[BF V11.9] FULL refresh waiting:",
-			State.Stats.LastError
-		)
-
-		return false
+		evolution =
+			raceItem.Properties.Evolution
 
 	end
 
-	local evolution =
-		raceItem
-		.Properties
-		.Evolution
+	------------------------------------------------------
+	-- IMPORTANT:
+	-- Inventory must NEVER be blocked by missing Evolution.
+	-- V3 accounts can have valid GetAllItemValues data while
+	-- the current race record has no numeric Evolution field.
+	------------------------------------------------------
+
+	local raceLevel, raceLevelError =
+		queryRaceLevel()
+
+	State.Stats.RaceLevelLastCheck =
+		os.time()
+
+	State.Stats.RaceLevelLastError =
+		raceLevelError
+
+	local raceVersion =
+		raceLevel
+		or
+		evolution
 
 	------------------------------------------------------
 	-- INVENTORY
@@ -1513,7 +1575,7 @@ local function refreshFull()
 		Race.Value
 
 	State.Race.Version =
-		evolution
+		raceVersion
 
 	State.Race.Evolution =
 		evolution
@@ -1550,7 +1612,7 @@ local function refreshFull()
 	State.Stats.PullLeverLastError =
 		pullLeverError
 
-	if evolution == 4 then
+	if raceVersion == 4 then
 
 		State.Race.Tier =
 			State.Race.C
@@ -1620,11 +1682,19 @@ local function refreshFull()
 
 	print(
 		string.format(
-			"[BF V11.9] UPDATE #%d | %.3fs | %s | PL:%s | Fruits:%d Sword:%d Melee:%d",
+			"[BF V11.9] UPDATE #%d | %.3fs | %s | RaceLevel:%s | Evo:%s | PL:%s | Fruits:%d Sword:%d Melee:%d",
 			State.Revision,
 			State.Stats.LastFullDuration,
 			State.Race.Display
 				or "?",
+			tostring(
+				raceLevel
+				or "?"
+			),
+			tostring(
+				evolution
+				or "?"
+			),
 			State.Account.PullLever == true
 				and "YES"
 				or
